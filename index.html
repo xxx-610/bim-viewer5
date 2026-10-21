@@ -1,0 +1,632 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>BIM Walkthrough Viewer</title>
+  <style>
+    :root {
+      --bg: #eef1f4;
+      --panel: rgba(255, 255, 255, 0.92);
+      --text: #17202a;
+      --muted: #5f6c7b;
+      --accent: #146c94;
+      --danger: #b42318;
+      --shadow: 0 16px 40px rgba(15, 23, 42, 0.18);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      overflow: hidden;
+      font-family: "Microsoft YaHei", "Segoe UI", sans-serif;
+      color: var(--text);
+      background:
+        linear-gradient(135deg, rgba(20, 108, 148, 0.16), transparent 42%),
+        linear-gradient(315deg, rgba(52, 78, 65, 0.16), transparent 45%),
+        var(--bg);
+    }
+
+    #scene {
+      width: 100vw;
+      height: 100vh;
+      display: block;
+      touch-action: none;
+    }
+
+    .topbar {
+      position: fixed;
+      top: 16px;
+      left: 16px;
+      right: 16px;
+      z-index: 3;
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 12px;
+      pointer-events: none;
+    }
+
+    .brand,
+    .status,
+    .error,
+    .help,
+    button {
+      border: 1px solid rgba(23, 32, 42, 0.12);
+      background: var(--panel);
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(12px);
+    }
+
+    .brand {
+      max-width: min(520px, calc(100vw - 160px));
+      padding: 12px 14px;
+    }
+
+    .brand h1 {
+      margin: 0;
+      font-size: 16px;
+      line-height: 1.2;
+      font-weight: 700;
+    }
+
+    .brand p {
+      margin: 5px 0 0;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.5;
+    }
+
+    .actions {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+      gap: 8px;
+      pointer-events: auto;
+    }
+
+    button {
+      min-width: 44px;
+      height: 44px;
+      border-radius: 0;
+      color: var(--text);
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 700;
+      padding: 0 12px;
+    }
+
+    button:hover,
+    .actions button.active,
+    .touch-pad button.active-touch {
+      border-color: rgba(20, 108, 148, 0.55);
+      color: var(--accent);
+    }
+
+    .status,
+    .error {
+      position: fixed;
+      left: 50%;
+      bottom: 22px;
+      z-index: 4;
+      max-width: min(620px, calc(100vw - 32px));
+      transform: translateX(-50%);
+      padding: 14px 16px;
+      font-size: 14px;
+      line-height: 1.5;
+    }
+
+    .error {
+      display: none;
+      border-color: rgba(180, 35, 24, 0.28);
+      color: var(--danger);
+    }
+
+    .help {
+      position: fixed;
+      left: 16px;
+      bottom: 16px;
+      z-index: 3;
+      width: min(360px, calc(100vw - 32px));
+      padding: 12px 14px;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.6;
+      pointer-events: none;
+    }
+
+    .crosshair {
+      position: fixed;
+      left: 50%;
+      top: 50%;
+      z-index: 2;
+      width: 20px;
+      height: 20px;
+      transform: translate(-50%, -50%);
+      pointer-events: none;
+      opacity: 0;
+    }
+
+    .crosshair::before,
+    .crosshair::after {
+      position: absolute;
+      content: "";
+      background: rgba(23, 32, 42, 0.55);
+    }
+
+    .crosshair::before {
+      left: 9px;
+      top: 2px;
+      width: 2px;
+      height: 16px;
+    }
+
+    .crosshair::after {
+      left: 2px;
+      top: 9px;
+      width: 16px;
+      height: 2px;
+    }
+
+    .touch-controls {
+      position: fixed;
+      inset: auto 16px 18px 16px;
+      z-index: 5;
+      display: none;
+      justify-content: flex-start;
+      align-items: flex-end;
+      pointer-events: none;
+    }
+
+    .touch-pad {
+      display: grid;
+      grid-template-columns: repeat(3, 52px);
+      grid-template-rows: repeat(3, 52px);
+      gap: 8px;
+      pointer-events: auto;
+    }
+
+    .touch-pad button {
+      min-width: 52px;
+      width: 52px;
+      height: 52px;
+      padding: 0;
+      font-size: 18px;
+      touch-action: none;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+
+    .touch-pad .empty {
+      visibility: hidden;
+    }
+
+    .hidden {
+      display: none;
+    }
+
+    body.walkMode .crosshair {
+      opacity: 1;
+    }
+
+    body.walkMode .touch-controls {
+      display: flex;
+    }
+
+    @media (max-width: 760px) {
+      .brand {
+        max-width: calc(100vw - 140px);
+      }
+
+      .brand p {
+        display: none;
+      }
+
+      button {
+        height: 40px;
+        font-size: 12px;
+        padding: 0 10px;
+      }
+
+      .help {
+        display: none;
+      }
+    }
+  </style>
+</head>
+<body>
+  <canvas id="scene"></canvas>
+
+  <div class="topbar">
+    <section class="brand" aria-label="项目信息">
+      <h1>BIM 模型查看</h1>
+      <p id="modeHint">普通查看：左键旋转，滚轮缩放，右键平移。切换漫游后可像人在模型里走。</p>
+    </section>
+    <div class="actions">
+      <button id="orbitMode" type="button" class="active">普通查看</button>
+      <button id="walkMode" type="button">漫游模式</button>
+      <button id="resetCamera" type="button" title="重置视角" aria-label="重置视角">↺</button>
+      <button id="fullscreen" type="button" title="全屏查看" aria-label="全屏查看">⛶</button>
+    </div>
+  </div>
+
+  <div class="help" id="help">
+    普通查看：鼠标拖动旋转，滚轮缩放。漫游模式：W/A/S/D 前后左右，Q/E 升降，Shift 加速，鼠标或手指拖动画面转向。手机端用左侧方向键移动。
+  </div>
+
+  <div class="crosshair" aria-hidden="true"></div>
+  <div id="status" class="status">正在加载 model.glb...</div>
+  <div id="error" class="error"></div>
+
+  <div class="touch-controls" id="touchControls">
+    <div class="touch-pad" id="touchMovePad" aria-label="手机移动控制">
+      <span class="empty"></span>
+      <button data-move="forward" type="button">↑</button>
+      <span class="empty"></span>
+      <button data-move="left" type="button">←</button>
+      <button data-move="backward" type="button">↓</button>
+      <button data-move="right" type="button">→</button>
+      <span class="empty"></span>
+      <button data-move="up" type="button">升</button>
+      <button data-move="down" type="button">降</button>
+    </div>
+  </div>
+
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "./vendor/three/three.module.js"
+      }
+    }
+  </script>
+
+  <script type="module">
+    import * as THREE from "three";
+    import { GLTFLoader } from "./vendor/three/addons/loaders/GLTFLoader.js";
+
+    const canvas = document.querySelector("#scene");
+    const statusBox = document.querySelector("#status");
+    const errorBox = document.querySelector("#error");
+    const orbitButton = document.querySelector("#orbitMode");
+    const walkButton = document.querySelector("#walkMode");
+    const resetButton = document.querySelector("#resetCamera");
+    const fullscreenButton = document.querySelector("#fullscreen");
+    const modeHint = document.querySelector("#modeHint");
+    const touchMovePad = document.querySelector("#touchMovePad");
+
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0xeef1f4);
+
+    const camera = new THREE.PerspectiveCamera(60, 1, 0.05, 5000);
+    const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: false });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+
+    const hemi = new THREE.HemisphereLight(0xffffff, 0x6b7280, 2.2);
+    scene.add(hemi);
+    const sun = new THREE.DirectionalLight(0xffffff, 2.2);
+    sun.position.set(20, 35, 20);
+    scene.add(sun);
+
+    const clock = new THREE.Clock();
+    const keys = new Set();
+    const touchMoves = new Set();
+    const target = new THREE.Vector3();
+    const modelBox = new THREE.Box3();
+    const modelCenter = new THREE.Vector3();
+    const modelSize = new THREE.Vector3();
+    const spherical = new THREE.Spherical();
+    const raycaster = new THREE.Raycaster();
+    const down = new THREE.Vector3(0, -1, 0);
+    const moveVector = new THREE.Vector3();
+    const forward = new THREE.Vector3();
+    const right = new THREE.Vector3();
+    const tmp = new THREE.Vector3();
+
+    let model = null;
+    let mode = "orbit";
+    let orbitRadius = 10;
+    let yaw = 0;
+    let pitch = 0;
+    let dragging = false;
+    let dragMode = "orbit";
+    let lastX = 0;
+    let lastY = 0;
+    let eyeHeight = 1.6;
+    let baseSpeed = 2.2;
+    let modelReady = false;
+
+    function showError(message) {
+      statusBox.classList.add("hidden");
+      errorBox.textContent = message;
+      errorBox.style.display = "block";
+    }
+
+    function hideStatus() {
+      statusBox.classList.add("hidden");
+    }
+
+    function resize() {
+      const width = window.innerWidth;
+      const height = window.innerHeight;
+      camera.aspect = width / height;
+      camera.updateProjectionMatrix();
+      renderer.setSize(width, height, false);
+    }
+
+    function setOrbitCamera() {
+      spherical.radius = orbitRadius;
+      spherical.phi = THREE.MathUtils.clamp(spherical.phi || Math.PI / 3, 0.12, Math.PI - 0.12);
+      spherical.theta = spherical.theta || Math.PI / 4;
+      camera.position.setFromSpherical(spherical).add(target);
+      camera.lookAt(target);
+    }
+
+    function setMode(nextMode) {
+      if (nextMode === mode) {
+        return;
+      }
+
+      const previousMode = mode;
+      mode = nextMode;
+      document.body.classList.toggle("walkMode", mode === "walk");
+      orbitButton.classList.toggle("active", mode === "orbit");
+      walkButton.classList.toggle("active", mode === "walk");
+
+      if (mode === "walk") {
+        modeHint.textContent = "漫游模式：W/A/S/D 移动，鼠标拖动画面转向；手机用方向键和右侧触控区。";
+        const direction = new THREE.Vector3();
+        camera.getWorldDirection(direction);
+        yaw = Math.atan2(direction.x, direction.z);
+        pitch = Math.asin(THREE.MathUtils.clamp(direction.y, -0.98, 0.98));
+        if (previousMode !== "walk") {
+          camera.position.copy(modelCenter);
+          camera.position.y = modelBox.min.y + eyeHeight;
+          camera.position.z += Math.max(modelSize.z * 0.35, 2);
+        }
+        updateWalkLook();
+      } else {
+        modeHint.textContent = "普通查看：左键旋转，滚轮缩放，右键平移。切换漫游后可像人在模型里走。";
+        setOrbitCamera();
+      }
+    }
+
+    function updateWalkLook() {
+      const cosPitch = Math.cos(pitch);
+      const look = new THREE.Vector3(
+        Math.sin(yaw) * cosPitch,
+        Math.sin(pitch),
+        Math.cos(yaw) * cosPitch
+      );
+      camera.lookAt(tmp.copy(camera.position).add(look));
+    }
+
+    function resetCamera() {
+      if (!modelReady) {
+        return;
+      }
+      orbitRadius = Math.max(modelSize.length() * 0.85, 5);
+      spherical.radius = orbitRadius;
+      spherical.theta = Math.PI / 4;
+      spherical.phi = Math.PI / 3;
+      target.copy(modelCenter);
+      setMode("orbit");
+    }
+
+    function keepWalkInsideBounds() {
+      const margin = Math.max(modelSize.length() * 0.35, 8);
+      camera.position.x = THREE.MathUtils.clamp(camera.position.x, modelBox.min.x - margin, modelBox.max.x + margin);
+      camera.position.y = THREE.MathUtils.clamp(camera.position.y, modelBox.min.y + 0.2, modelBox.max.y + margin);
+      camera.position.z = THREE.MathUtils.clamp(camera.position.z, modelBox.min.z - margin, modelBox.max.z + margin);
+    }
+
+    function updateWalk(delta) {
+      moveVector.set(0, 0, 0);
+      const moveForward = keys.has("KeyW") || touchMoves.has("forward");
+      const moveBackward = keys.has("KeyS") || touchMoves.has("backward");
+      const moveLeft = keys.has("KeyA") || touchMoves.has("left");
+      const moveRight = keys.has("KeyD") || touchMoves.has("right");
+      const moveUp = keys.has("KeyE") || touchMoves.has("up");
+      const moveDown = keys.has("KeyQ") || touchMoves.has("down");
+
+      updateWalkLook();
+      camera.updateMatrixWorld();
+      camera.getWorldDirection(forward);
+      forward.y = 0;
+      forward.normalize();
+      right.setFromMatrixColumn(camera.matrixWorld, 0);
+      right.y = 0;
+      right.normalize();
+
+      if (moveForward) moveVector.add(forward);
+      if (moveBackward) moveVector.sub(forward);
+      if (moveRight) moveVector.add(right);
+      if (moveLeft) moveVector.sub(right);
+      if (moveUp) moveVector.y += 1;
+      if (moveDown) moveVector.y -= 1;
+
+      const manualVerticalMove = moveUp || moveDown;
+
+      if (moveVector.lengthSq() > 0) {
+        const speed = (keys.has("ShiftLeft") || keys.has("ShiftRight")) ? baseSpeed * 2.3 : baseSpeed;
+        moveVector.normalize().multiplyScalar(speed * delta);
+        camera.position.add(moveVector);
+        keepWalkInsideBounds();
+      }
+
+      updateWalkLook();
+    }
+
+    function animate() {
+      requestAnimationFrame(animate);
+      const delta = Math.min(clock.getDelta(), 0.05);
+      if (mode === "walk") {
+        updateWalk(delta);
+      }
+      renderer.render(scene, camera);
+    }
+
+    function loadModel() {
+      const loader = new GLTFLoader();
+      loader.load(
+        "./model.glb",
+        (gltf) => {
+          model = gltf.scene;
+          scene.add(model);
+          modelBox.setFromObject(model);
+          modelBox.getCenter(modelCenter);
+          modelBox.getSize(modelSize);
+          target.copy(modelCenter);
+          eyeHeight = Math.max(modelSize.y * 0.04, 1.6);
+          baseSpeed = Math.max(modelSize.length() * 0.08, 1.8);
+          modelReady = true;
+          resetCamera();
+          hideStatus();
+        },
+        (event) => {
+          if (event.total) {
+            const percent = Math.round((event.loaded / event.total) * 100);
+            statusBox.textContent = `正在加载 model.glb... ${percent}%`;
+          }
+        },
+        (error) => {
+          console.error(error);
+          showError("没有加载到 model.glb。请确认 viewer 文件夹里已经放入转换后的 model.glb，并通过网页服务器访问。");
+        }
+      );
+    }
+
+    canvas.addEventListener("pointerdown", (event) => {
+      dragging = true;
+      dragMode = mode;
+      lastX = event.clientX;
+      lastY = event.clientY;
+      canvas.setPointerCapture(event.pointerId);
+    });
+
+    canvas.addEventListener("pointermove", (event) => {
+      if (!dragging) {
+        return;
+      }
+      const dx = event.clientX - lastX;
+      const dy = event.clientY - lastY;
+      lastX = event.clientX;
+      lastY = event.clientY;
+
+      if (dragMode === "walk") {
+        yaw -= dx * 0.004;
+        pitch = THREE.MathUtils.clamp(pitch - dy * 0.003, -1.35, 1.35);
+        updateWalkLook();
+      } else {
+        spherical.theta -= dx * 0.006;
+        spherical.phi = THREE.MathUtils.clamp(spherical.phi - dy * 0.006, 0.12, Math.PI - 0.12);
+        setOrbitCamera();
+      }
+    });
+
+    canvas.addEventListener("pointerup", (event) => {
+      dragging = false;
+      canvas.releasePointerCapture(event.pointerId);
+    });
+
+    canvas.addEventListener("wheel", (event) => {
+      if (mode !== "orbit") {
+        return;
+      }
+      event.preventDefault();
+      orbitRadius = THREE.MathUtils.clamp(orbitRadius * (1 + event.deltaY * 0.001), 0.5, Math.max(modelSize.length() * 4, 20));
+      spherical.radius = orbitRadius;
+      setOrbitCamera();
+    }, { passive: false });
+
+    window.addEventListener("keydown", (event) => {
+      keys.add(event.code);
+      if (["KeyW", "KeyA", "KeyS", "KeyD", "KeyQ", "KeyE"].includes(event.code)) {
+        event.preventDefault();
+      }
+    });
+
+    window.addEventListener("keyup", (event) => {
+      keys.delete(event.code);
+    });
+
+    function clearTouchMove(button, pointerId) {
+      if (!button) {
+        return;
+      }
+      touchMoves.delete(button.dataset.move);
+      button.classList.remove("active-touch");
+      if (pointerId !== undefined && button.hasPointerCapture(pointerId)) {
+        button.releasePointerCapture(pointerId);
+      }
+    }
+
+    function clearAllTouchMoves() {
+      touchMoves.clear();
+      touchMovePad.querySelectorAll("[data-move]").forEach((button) => button.classList.remove("active-touch"));
+    }
+
+    touchMovePad.addEventListener("pointerdown", (event) => {
+      const button = event.target.closest("[data-move]");
+      if (button) {
+        event.preventDefault();
+        event.stopPropagation();
+        touchMoves.add(button.dataset.move);
+        button.classList.add("active-touch");
+        button.setPointerCapture(event.pointerId);
+      }
+    });
+
+    function releaseTouchMove(event) {
+      const button = event.target.closest("[data-move]");
+      if (button) {
+        event.preventDefault();
+        event.stopPropagation();
+        clearTouchMove(button, event.pointerId);
+      }
+    }
+
+    touchMovePad.addEventListener("pointerup", releaseTouchMove);
+    touchMovePad.addEventListener("pointercancel", releaseTouchMove);
+    touchMovePad.addEventListener("pointerleave", releaseTouchMove);
+    window.addEventListener("blur", clearAllTouchMoves);
+    document.addEventListener("visibilitychange", () => {
+      if (document.hidden) {
+        clearAllTouchMoves();
+      }
+    });
+
+    orbitButton.addEventListener("click", () => setMode("orbit"));
+    walkButton.addEventListener("click", () => setMode("walk"));
+    resetButton.addEventListener("click", resetCamera);
+
+    fullscreenButton.addEventListener("click", async () => {
+      const targetElement = document.documentElement;
+      if (!document.fullscreenElement) {
+        await targetElement.requestFullscreen();
+      } else {
+        await document.exitFullscreen();
+      }
+    });
+
+    window.__bimViewerDebug = {
+      getState: () => ({
+        mode,
+        position: camera.position.toArray(),
+        modelReady
+      })
+    };
+
+    window.addEventListener("resize", resize);
+    resize();
+    loadModel();
+    animate();
+  </script>
+</body>
+</html>
