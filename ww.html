@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#182724">
+  <title>康复疗养民宿</title>
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="./ww.css">
+  <script type="importmap">{"imports":{"three":"./vendor/three/three.module.js"}}</script>
+</head>
+<body>
+  <canvas id="scene" aria-label="三维建筑模型"></canvas>
+  <header>
+    <div class="brand"><span class="mark">康</span><div><h1>康复疗养民宿</h1><p>建筑 · 管线 · 自由漫游</p></div></div>
+    <div class="tools"><button id="reset" aria-label="复位视角" title="复位视角">↺</button><button id="fullscreen" aria-label="全屏" title="全屏">⛶</button></div>
+  </header>
+  <div id="loading" role="status"><div class="loader"></div><h2>正在准备空间</h2><p id="progress">加载建筑模型…</p></div>
+  <div id="error" role="alert" hidden></div>
+  <aside id="floor-panel" hidden><p class="eyebrow">快捷到达</p><div id="floors"></div></aside>
+  <div id="tip" role="status">单指旋转 · 双指缩放</div>
+  <nav aria-label="查看模式"><button id="overview" class="active">整栋查看</button><button id="walk" aria-label="进入漫游">进入漫游 <span>↗</span></button></nav>
+  <div id="walk-hint" hidden>左手移动 · 右手转向</div>
+  <div id="joystick" aria-label="移动摇杆" hidden><span class="joy-axis"></span><span id="stick"></span></div>
+  <div id="crosshair" hidden></div>
+  <div class="footnote">3D WALKTHROUGH <span>·</span> 自由探索每一处空间</div>
+  <script type="module" src="./ww.js"></script>
+</body>
+</html>
